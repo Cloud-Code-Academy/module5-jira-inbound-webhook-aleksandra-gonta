@@ -31,8 +31,10 @@ global without sharing class WebhookResource {
         String webhookType = getWebhookTypeFromPath(req.requestURI);
         try {
             WebhookFactory.processWebhook(webhookType, req);
+            res.statusCode = 200;
             return new ResponseWrapper('success', 'Webhook processed successfully');
         } catch (Exception e) {
+            res.statusCode = 400; 
             return new ResponseWrapper('error', 'An error occurred while processing the jirawebhook: ' + e.getMessage());
         }
     }
