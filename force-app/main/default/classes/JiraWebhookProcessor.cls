@@ -95,7 +95,7 @@ public without sharing class JiraWebhookProcessor implements IWebhookProcessor {
 			} else if (webhookEvent == EVENT_PROJECT_DELETED) {
 				processProjectDeleted(payload);
 			} else {
-				Logger.error('Unknown webhook event: ' + e.getMessage());
+				Logger.error('Unknown webhook event: ' + webhookEvent);
 				Logger.saveLog();
 			}
 		} catch (Exception e) {
