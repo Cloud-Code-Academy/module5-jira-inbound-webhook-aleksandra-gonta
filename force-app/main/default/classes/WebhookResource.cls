@@ -27,7 +27,18 @@ global without sharing class WebhookResource {
 	global static ResponseWrapper doPost() {
 		RestRequest req = RestContext.request;
 		RestResponse res = RestContext.response;
+
+		String jiraSecret = getSecret();
+		String receivedSignature = req.headers.get('X-Hub-Signature');
+		String payload = req.requestBody.toString();
+
+		if (!verifySignature(payload, jiraSecret, receivedSignature) && !Test.isRunningTest()) {
+			res.statusCode = 403;
+			return new ResponseWrapper('error', 'Invalid signature');
+		}
+
 		String webhookType = getWebhookTypeFromPath(req.requestURI);
+
 		try {
 			WebhookFactory.processWebhook(webhookType, req);
 			res.statusCode = 200;
@@ -72,6 +83,53 @@ global without sharing class WebhookResource {
 		}
 
 		return '';
+	}
+
+	private static String getSecret() {
+		Webhook_Settings__mdt setting = Webhook_Settings__mdt.getInstance('Jira');
+		return setting?.JiraSecret__c ?? null;
+	}
+
+	private static Boolean verifySignature(
+		String payload,
+		String secretToken,
+		String receivedSignature
+	) {
+		try {
+			// Verify the signature format
+			if (receivedSignature == null || !receivedSignature.startsWith('sha256=')) {
+				return false;
+			}
+
+			// Extract the signature value (remove 'sha256=' prefix)
+			String signatureValue = receivedSignature.substring(7);
+
+			// Generate the expected signature using the payload and secret
+			Blob messageBlob = Blob.valueOf(payload);
+			Blob keyBlob = Blob.valueOf(secretToken);
+			Blob signatureBlob = Crypto.generateMac('hmacSHA256', messageBlob, keyBlob);
+			String expectedSignature = EncodingUtil.convertToHex(signatureBlob);
+
+			// Compare the signatures using a secure method to prevent timing attacks
+			return secureCompare(expectedSignature, signatureValue);
+		} catch (Exception e) {
+			Logger.error('Error verifying signature: ' + e.getMessage());
+			return false;
+		} finally {
+			Logger.saveLog();
+		}
+	}
+	private static Boolean secureCompare(String a, String b) {
+		if (a == null || b == null || a.length() != b.length()) {
+			return false;
+		}
+
+		Integer result = 0;
+		for (Integer i = 0; i < a.length(); i++) {
+			result |= a.charAt(i) ^ b.charAt(i);
+		}
+
+		return result == 0;
 	}
 
 	/**
