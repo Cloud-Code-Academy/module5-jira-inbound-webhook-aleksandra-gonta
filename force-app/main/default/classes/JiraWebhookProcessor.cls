@@ -146,8 +146,11 @@ public without sharing class JiraWebhookProcessor implements IWebhookProcessor {
 	 */
 	private void processIssueUpdated(Map<String, Object> payload) {
 		try {
-			Map<String, Object> issueData = (Map<String, Object>) payload.get('issue');
-			String issueKey = (String) issueData.get('key');
+			JiraWrapper.IssueWrapper issueWrapper = (JiraWrapper.IssueWrapper) JSON.deserialize(
+				issueJson,
+				JiraWrapper.IssueWrapper.class
+			);
+			String issueKey = issueWrapper.key;
 			Jira_Issue__c issueRecord;
 
 			List<Jira_Issue__c> issueList = [
@@ -184,8 +187,11 @@ public without sharing class JiraWebhookProcessor implements IWebhookProcessor {
 	 */
 	private void processIssueDeleted(Map<String, Object> payload) {
 		try {
-			Map<String, Object> issueData = (Map<String, Object>) payload.get('issue');
-			String issueKey = (String) issueData.get('key');
+			JiraWrapper.IssueWrapper issueWrapper = (JiraWrapper.IssueWrapper) JSON.deserialize(
+				issueJson,
+				JiraWrapper.IssueWrapper.class
+			);
+			String issueKey = issueWrapper.key;
 
 			List<Jira_Issue__c> issueList = [
 				SELECT Id
@@ -240,8 +246,12 @@ public without sharing class JiraWebhookProcessor implements IWebhookProcessor {
 	 */
 	private void processProjectUpdated(Map<String, Object> payload) {
 		try {
-			Map<String, Object> projectData = (Map<String, Object>) payload.get('project');
-			String projectKey = (String) projectData.get('key');
+			JiraWrapper.ProjectWrapper projectWrapper = (JiraWrapper.ProjectWrapper) JSON.deserialize(
+				projectJson,
+				JiraWrapper.ProjectWrapper.class
+			);
+			String projectKey = projectWrapper.key;
+
 			Jira_Project__c projectRecord;
 
 			List<Jira_Project__c> projectList = [
@@ -279,7 +289,11 @@ public without sharing class JiraWebhookProcessor implements IWebhookProcessor {
 	private void processProjectDeleted(Map<String, Object> payload) {
 		try {
 			Map<String, Object> projectData = (Map<String, Object>) payload.get('project');
-			String projectKey = (String) projectData.get('key');
+			JiraWrapper.ProjectWrapper projectWrapper = (JiraWrapper.ProjectWrapper) JSON.deserialize(
+				projectJson,
+				JiraWrapper.ProjectWrapper.class
+			);
+			String projectKey = projectWrapper.key;
 
 			List<Jira_Project__c> projectList = [
 				SELECT Id
@@ -314,16 +328,18 @@ public without sharing class JiraWebhookProcessor implements IWebhookProcessor {
 	 * 2. Map the fields to a new Jira_Issue__c record
 	 */
 	private Jira_Issue__c createIssueRecord(Map<String, Object> issueData) {
-		String issueKey = (String) issueData.get('key');
-		String projectKey = issueKey.substringBefore('-');
+		String issueJson = JSON.serialize(issueData);
+		JiraWrapper.IssueWrapper issueWrapper = (JiraWrapper.IssueWrapper) JSON.deserialize(
+			issueJson,
+			JiraWrapper.IssueWrapper.class
+		);
 
-		Map<String, Object> fields = (Map<String, Object>) issueData.get('fields');
-		String summary = (String) fields.get('summary');
-		String description = (String) fields.get('description');
-		Map<String, Object> issueType = (Map<String, Object>) fields.get('issuetype');
-		String issueTypeName = (String) issueType.get('name');
-		Map<String, Object> status = (Map<String, Object>) fields.get('status');
-		String statusName = (String) status.get('name');
+		String issueKey = issueWrapper.key;
+		String projectKey = issueKey.substringBefore('-');
+		String summary = issueWrapper.fields.summary;
+		String description = issueWrapper.fields.description;
+		String issueTypeName = issueWrapper.fields.issuetype.name;
+		String statusName = issueWrapper.fields.status.name;
 
 		Jira_Issue__c issue = new Jira_Issue__c(
 			Issue_Key__c = issueKey,
@@ -350,13 +366,15 @@ public without sharing class JiraWebhookProcessor implements IWebhookProcessor {
 		Jira_Issue__c existingIssue,
 		Map<String, Object> issueData
 	) {
-		Map<String, Object> fields = (Map<String, Object>) issueData.get('fields');
-		String summary = (String) fields.get('summary');
-		String description = (String) fields.get('description');
-		Map<String, Object> issueType = (Map<String, Object>) fields.get('issuetype');
-		String issueTypeName = (String) issueType.get('name');
-		Map<String, Object> status = (Map<String, Object>) fields.get('status');
-		String statusName = (String) status.get('name');
+		String issueJson = JSON.serialize(issueData);
+		JiraWrapper.IssueWrapper issueWrapper = (JiraWrapper.IssueWrapper) JSON.deserialize(
+			issueJson,
+			JiraWrapper.IssueWrapper.class
+		);
+		String summary = issueWrapper.fields.summary;
+		String description = issueWrapper.fields.description;
+		String issueTypeName = issueWrapper.fields.issuetype.name;
+		String statusName = issueWrapper.fields.status.name;
 
 		existingIssue.Summary__c = summary;
 		existingIssue.Description__c = description;
@@ -376,10 +394,15 @@ public without sharing class JiraWebhookProcessor implements IWebhookProcessor {
 	 * Implement logic to extract project fields and create a record
 	 */
 	private Jira_Project__c createProjectRecord(Map<String, Object> projectData) {
-		String projectKey = (String) projectData.get('key');
-		String name = (String) projectData.get('name');
-		String projectId = String.valueOf(projectData.get('id'));
-		String description = String.valueOf(projectData.get('description'));
+		String projectJson = JSON.serialize(projectData);
+		JiraWrapper.ProjectWrapper projectWrapper = (JiraWrapper.ProjectWrapper) JSON.deserialize(
+			projectJson,
+			JiraWrapper.ProjectWrapper.class
+		);
+		String name = projectWrapper.name;
+		String description = projectWrapper.description;
+		String projectKey = projectWrapper.key;
+		String projectId = projectWrapper.id;
 
 		Jira_Project__c project = new Jira_Project__c(
 			Project_Key__c = projectKey,
@@ -405,8 +428,13 @@ public without sharing class JiraWebhookProcessor implements IWebhookProcessor {
 		Jira_Project__c existingProject,
 		Map<String, Object> projectData
 	) {
-		String name = (String) projectData.get('name');
-		String description = String.valueOf(projectData.get('description'));
+		String projectJson = JSON.serialize(projectData);
+		JiraWrapper.ProjectWrapper projectWrapper = (JiraWrapper.ProjectWrapper) JSON.deserialize(
+			projectJson,
+			JiraWrapper.ProjectWrapper.class
+		);
+		String name = projectWrapper.name;
+		String description = projectWrapper.description;
 
 		existingProject.Name = name;
 		existingProject.Project_Name__c = name;
